@@ -47,8 +47,8 @@ class Layer {
     }
     vector<double> forwardPropagate(vector<double> tmp_inputVals) { //accept input vals, do matrix mult, add bias, for each in vals activation function, return new output 
         inputVals = tmp_inputVals;
-        cout << "sizeof weights         " << weights[0].size() << endl;
-        cout << "sizeof input values    " << tmp_inputVals.size() << endl;
+ //       cout << "sizeof weights         " << weights[0].size() << endl;
+ //       cout << "sizeof input values    " << tmp_inputVals.size() << endl;
         if (weights.size() == 0 || tmp_inputVals.size() != weights[0].size()) {
             throw std::invalid_argument("Input size does not match weights size.");
         }
@@ -64,60 +64,11 @@ class Layer {
         for (size_t i = 0; i < activations.size(); ++i) {
             activations[i] = activationFunction(activations[i]);
         }
-        for(auto it :  activations) {
-            cout << it << " ";
-        } 
-        cout << endl;
+       // cout << endl;
+        
         lastOutput = activations;
         return activations;
     }
-    /*
-    void backwardPropagate(vector<double>& gradient, double learningRate) {
-    // Assuming 'gradient' is dLoss/dOut of this layer
-    // Compute dOut/dNet (the derivative of the activation function)
-    vector<double> dOut_dNet(lastOutput.size());
-    for (size_t i = 0; i < lastOutput.size(); ++i) {
-        dOut_dNet[i] = activationDerivative(lastOutput[i]);
-    }
-
-    // Compute dLoss/dNet (gradient with respect to the inputs of the activation function)
-    vector<double> dLoss_dNet(lastOutput.size());
-    for (size_t i = 0; i < gradient.size(); ++i) {
-        dLoss_dNet[i] = gradient[i] * dOut_dNet[i];
-    }
-
-    // If there is a previous layer, prepare its gradient
-    vector<double> prevLayerGradient;
-    if (prev) {
-        prevLayerGradient.resize(weights[0].size(), 0.0);
-        for (size_t i = 0; i < weights.size(); ++i) {
-            for (size_t j = 0; j < weights[0].size(); ++j) {
-                prevLayerGradient[j] += dLoss_dNet[i] * weights[i][j];
-            }
-        }
-    }
-
-    // Compute gradients with respect to weights and biases
-    for (size_t i = 0; i < weights.size(); ++i) {
-        for (size_t j = 0; j < weights[i].size(); ++j) {
-            // For weight[i][j], the gradient is the product of the
-            // derivative of the loss with respect to the net input of this layer
-            // and the activation of the previous layer
-            weights[i][j] -= learningRate * dLoss_dNet[i] * (prev ? prev->lastOutput[j] : 0); // prev->lastOutput[j] should be replaced with the correct previous layer output if available
-        }
-        // For bias[i], the gradient is the derivative of the loss with respect to the net input
-        bias[i] -= learningRate * dLoss_dNet[i];
-    }
-
-    // Call all callbacks
-    callAllCallBacks();
-
-    // If there is a previous layer, propagate the gradient backward
-    if (prev) {
-        prev->backwardPropagate(prevLayerGradient, learningRate);
-    }
-    }
-    */
     void backwardPropagate(vector<double>& gradient, double learningRate) {
     // Compute dOut/dNet (the derivative of the activation function)
     vector<double> dOut_dNet(lastOutput.size());
@@ -151,21 +102,8 @@ class Layer {
         bias[i] -= learningRate * dLoss_dNet[i];
     }
 
-    // Call all callbacks here if you have any
-    callAllCallBacks();
-
-    // Note: The propagation to the previous layer is handled by the loop in backPropagate
 }
 
-
-    void updateWeights(double learningRate) { //XXX
-        // Update the weights and biases using the stored gradients and learning rate
-    }
-
-    void callAllCallBacks() { ///XXX
-        //go through callback list and call functions
-        cout << "unfinished" << endl;
-    }
 };
 
 /*

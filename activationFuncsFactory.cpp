@@ -23,10 +23,20 @@ double relu_derivative(double x) {
 }
 
 
+double tanhAct(double input) { // (e^(x) - e^(-x)) / (e^(x) + e^(-x))
+    return tanh(input);
+}
+double tanh_derivative(double input) {
+    // Tanh derivative: 1 - tanh^2(x)
+    double tanhValue = tanhAct(input);
+    return 1.0 - tanhValue * tanhValue;
+}
+
 ActivationPair getActivationFunctions(const std::string& name) {
     static std::unordered_map<std::string, ActivationPair> activation_map = {
         {"sigmoid", {sigmoid, sigmoid_derivative}},
         {"relu", {relu, relu_derivative}},
+        {"tanh", {tanhAct, tanh_derivative}},
         // ... Add other mappings as needed ...
     };
 

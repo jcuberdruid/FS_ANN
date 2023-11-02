@@ -38,15 +38,17 @@ model class
 #include"lossFuncsFactory.cpp"
 #include"optimizer.cpp"
 #include <iomanip>
+#include<fstream>
 using namespace std;
 using FunctionType = double(*)(double); //for function pointers 
 using CallBackFunctionType = void(*)(Layer*);
 
 class Model {
-public: 
+ public: 
+    int totalPredictions = 0;
+    int correctPredictions = 0;
     LossFunction lossFunction;        
     LossDerivative lossDerivative;
-    
     Optimizer optimizer;
     double learningRate;
     //int batchSize; <- mayber not 
@@ -87,11 +89,40 @@ public:
 
     void teach(vector<double> input_data, vector<int> input_labels){
         vector<double> modelOutput = forwardPropagate(input_data);  
-        cout << lossFunction (modelOutput, input_labels) << endl;
+        //cout << "######################" << endl;
+        cout << "loss "<<lossFunction (modelOutput, input_labels) << endl;
+        vector<double> softmaxOutput = softmax(modelOutput);
+        //cout << "######################" << endl;
+        for(auto it: input_data) { 
+            cout << " " << it; 
+        }
+        cout << endl;
+        for(auto it: input_labels) { 
+            cout << it << "           "; 
+        }
+        cout << endl;
+        for(auto it: softmaxOutput) { 
+            cout << " " << it;  
+        }
+        cout << endl;
+        auto max_it = std::max_element(softmaxOutput.begin(), softmaxOutput.end()); //XXX max function can't handle equal inputs 
+        int max_index = std::distance(softmaxOutput.begin(), max_it);
+        if(input_labels[max_index] == 1) {
+           correctPredictions += 1;  
+           totalPredictions +=1;
+        } else {
+            totalPredictions +=1;
+        }
+        cout << "accuracy: " << float(correctPredictions)/float(totalPredictions) << endl;
+
+        ofstream myfile;
+          myfile.open ("accuracyLog.txt",ios::app);
+          myfile << float(correctPredictions)/float(totalPredictions)  << "\n";
+          myfile.close();
+
+        cout << "######################" << endl;
+
         backPropagate(modelOutput, input_labels);
-        //calc loss 
-        //backward pass (calc gradient)
-        //update weights 
     }
     void infoLayers() {
         cout << "Layer (type)\t\tWeight Matrix Shape\t\tParam #" << endl;
@@ -114,8 +145,8 @@ public:
         }
         cout << "=======================================================================" << endl;
         cout << "Total params: " << totalParams << endl;
-        cout << "Trainable params: " << totalParams << endl; // Assuming all params are trainable
-        cout << "Non-trainable params: 0" << endl; // Adjust if you have non-trainable parameters
+        cout << "Trainable params: " << totalParams << endl; 
+        cout << "Non-trainable params: 0" << endl; 
         cout << "Total layers: " << numLayers << endl;
         }
     
@@ -129,24 +160,10 @@ private:
         }
     return input_data;
     }
-/*
-    void backPropagate(vector<double>& output, vector<int>& trueLabels) { //XXX
-        vector<double> gradient = lossDerivative(output, trueLabels);
-        Layer* current = topographyHead;
-        while (current->next != NULL) {
-                current = current->next;
-        }
-        Layer* topographyTail = current;
-        while (current != NULL) {
-            current->backwardPropagate(gradient, learningRate);
-            current = current->prev; 
-        }
-    }
-*/
+
 void backPropagate(vector<double>& output, vector<int>& trueLabels) {
     vector<double> gradient = lossDerivative(output, trueLabels);
 
-    // Build a list of layers to update, in reverse order
     std::vector<Layer*> layersToUpdate;
     Layer* current = topographyHead;
     while (current) {
@@ -155,22 +172,12 @@ void backPropagate(vector<double>& output, vector<int>& trueLabels) {
     }
     std::reverse(layersToUpdate.begin(), layersToUpdate.end());
 
-    // Now iterate over the layers and apply backpropagation
     for (Layer* layer : layersToUpdate) {
         layer->backwardPropagate(gradient, learningRate);
-        // The gradient for the next layer is the previous layer gradient computed during the backpropagation step
-        gradient = layer->prevLayerGradient; // Ensure that each Layer has a `prevLayerGradient` member to store this
+        gradient = layer->prevLayerGradient; 
     }
 }
 
-
-    void updateWeights(double learningRate) { //XXX
-        Layer* current = topographyHead;
-        while (current != NULL) {
-            current->updateWeights(learningRate);
-            current = current->next;
-        }
-    }
 };
 
 
