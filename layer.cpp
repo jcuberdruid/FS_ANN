@@ -37,6 +37,8 @@ class Layer {
         }
     }
     vector<double> forwardPropagate(vector<double> inputVals) { //accept input vals, do matrix mult, add bias, for each in vals activation function, return new output 
+        cout << weights[0].size() << endl;;
+        cout << inputVals.size() << endl;;
         if (weights.size() == 0 || inputVals.size() != weights[0].size()) {
             throw std::invalid_argument("Input size does not match weights size.");
         }
@@ -52,6 +54,10 @@ class Layer {
         for (size_t i = 0; i < activations.size(); ++i) {
             activations[i] = activationFunction(activations[i]);
         }
+        for(auto it :  activations) {
+            cout << it;
+        } 
+        cout << endl;
         return activations;
     }
     void callAllCallBacks() {

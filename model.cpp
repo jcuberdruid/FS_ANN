@@ -77,11 +77,13 @@ public:
         }
     }
 
-    void teach(){}
+    void teach(vector<double> input_data){
+        forwardPropagate(input_data);
+    }
     void infoLayers() {
         // Header for the summary
-        cout << "Layer (type)\t\tOutput Shape\t\tParam #" << endl;
-        cout << "=================================================" << endl;
+        cout << "Layer (type)\t\tWeight Matrix Shape\t\tParam #" << endl;
+        cout << "=======================================================================" << endl;
 
         Layer* current = topographyHead;
         int totalParams = 0;
@@ -104,7 +106,7 @@ public:
         }
 
         // Footer for the summary
-        cout << "=================================================" << endl;
+        cout << "=======================================================================" << endl;
         cout << "Total params: " << totalParams << endl;
         cout << "Trainable params: " << totalParams << endl; // Assuming all params are trainable
         cout << "Non-trainable params: 0" << endl; // Adjust if you have non-trainable parameters
@@ -112,7 +114,19 @@ public:
         }
     
 private:
-    void forwardPropagate(){}  
+    void forwardPropagate(vector<double> input_data){
+     Layer* current = topographyHead;
+    
+     while (current != NULL) {
+            input_data = current->forwardPropagate(input_data);
+            current = current->next;
+        }
+      
+    for(auto it : input_data) {
+        cout << it;
+    }
+    cout << endl;
+    }
     void backPropagate(){}
 };
 
