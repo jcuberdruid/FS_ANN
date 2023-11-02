@@ -35,6 +35,7 @@ model class
                 
 */
 #include"layer.cpp"
+#include"lossFuncsFactory.cpp"
 #include"optimizer.cpp"
 #include <iomanip>
 using namespace std;
@@ -43,7 +44,9 @@ using CallBackFunctionType = void(*)(Layer*);
 
 class Model {
 public: 
-    FunctionType lossFunction;        
+    LossFunction lossFunction;        
+    LossDerivative lossDerivative;
+    
     Optimizer optimizer;
     double learningRate;
     //int batchSize; <- mayber not 
@@ -53,9 +56,14 @@ public:
     Layer* topographyHead = NULL; 
     vector<CallBackFunctionType> callBacks; 
     
-    Model(FunctionType lossFunction, Optimizer optimizer, double learningRate) : lossFunction(lossFunction),  optimizer(optimizer), learningRate(learningRate){}
-    void addLayer(ActivFunctionType activationFunction, size_t numBias, tuple<int, int> shapeWeights, vector<CallBackFunctionType> callbacks) {
-        Layer* newLayer = new Layer(activationFunction, numBias, shapeWeights, callbacks);
+    Model(const string lossFunctionID, Optimizer optimizer, double learningRate) :  optimizer(optimizer), learningRate(learningRate){
+
+        auto [lossFunc, lossDeriv] = getLossFunctions(lossFunctionID);
+        lossFunction = lossFunc;
+        lossDerivative = lossDeriv;
+        }
+    void addLayer(string activationID, tuple<int, int> shapeWeights, vector<CallBackFunctionType> callbacks) {
+        Layer* newLayer = new Layer(activationID, shapeWeights, callbacks);
         
         if (topographyHead == NULL) {
             topographyHead = newLayer;
@@ -77,11 +85,15 @@ public:
         }
     }
 
-    void teach(vector<double> input_data){
-        forwardPropagate(input_data);
+    void teach(vector<double> input_data, vector<int> input_labels){
+        vector<double> modelOutput = forwardPropagate(input_data);  
+        cout << lossFunction (modelOutput, input_labels) << endl;
+        backPropagate(modelOutput, input_labels);
+        //calc loss 
+        //backward pass (calc gradient)
+        //update weights 
     }
     void infoLayers() {
-        // Header for the summary
         cout << "Layer (type)\t\tWeight Matrix Shape\t\tParam #" << endl;
         cout << "=======================================================================" << endl;
 
@@ -90,12 +102,8 @@ public:
         int numLayers = 0;
 
         while (current != NULL) {
-            // Assuming weight shape is a tuple where the first int is the number of neurons (output shape)
-            // and the second int is the input shape (not explicitly stored in the Layer class as per your code).
             auto shapeWeights = make_tuple(current->weights.size(), current->weights.empty() ? 0 : current->weights[0].size());
             int layerParams = get<0>(shapeWeights) * get<1>(shapeWeights) + get<0>(shapeWeights); // Weights + Bias
-
-            // Print the layer details
             cout << setw(10) << numLayers << " (Layer)\t\t" 
                       << "[" << get<0>(shapeWeights) << "," << get<1>(shapeWeights) << "]\t\t"
                       << layerParams << endl;
@@ -104,8 +112,6 @@ public:
             numLayers++;
             current = current->next;
         }
-
-        // Footer for the summary
         cout << "=======================================================================" << endl;
         cout << "Total params: " << totalParams << endl;
         cout << "Trainable params: " << totalParams << endl; // Assuming all params are trainable
@@ -114,20 +120,57 @@ public:
         }
     
 private:
-    void forwardPropagate(vector<double> input_data){
+    vector<double> forwardPropagate(vector<double> input_data){
      Layer* current = topographyHead;
     
      while (current != NULL) {
             input_data = current->forwardPropagate(input_data);
             current = current->next;
         }
-      
-    for(auto it : input_data) {
-        cout << it;
+    return input_data;
     }
-    cout << endl;
+/*
+    void backPropagate(vector<double>& output, vector<int>& trueLabels) { //XXX
+        vector<double> gradient = lossDerivative(output, trueLabels);
+        Layer* current = topographyHead;
+        while (current->next != NULL) {
+                current = current->next;
+        }
+        Layer* topographyTail = current;
+        while (current != NULL) {
+            current->backwardPropagate(gradient, learningRate);
+            current = current->prev; 
+        }
     }
-    void backPropagate(){}
+*/
+void backPropagate(vector<double>& output, vector<int>& trueLabels) {
+    vector<double> gradient = lossDerivative(output, trueLabels);
+
+    // Build a list of layers to update, in reverse order
+    std::vector<Layer*> layersToUpdate;
+    Layer* current = topographyHead;
+    while (current) {
+        layersToUpdate.push_back(current);
+        current = current->next;
+    }
+    std::reverse(layersToUpdate.begin(), layersToUpdate.end());
+
+    // Now iterate over the layers and apply backpropagation
+    for (Layer* layer : layersToUpdate) {
+        layer->backwardPropagate(gradient, learningRate);
+        // The gradient for the next layer is the previous layer gradient computed during the backpropagation step
+        gradient = layer->prevLayerGradient; // Ensure that each Layer has a `prevLayerGradient` member to store this
+    }
+}
+
+
+    void updateWeights(double learningRate) { //XXX
+        Layer* current = topographyHead;
+        while (current != NULL) {
+            current->updateWeights(learningRate);
+            current = current->next;
+        }
+    }
 };
 
 
