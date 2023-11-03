@@ -1,9 +1,12 @@
 #include<iostream>
 #include<vector>
 #include<random>
+//#include"eigen-3.4.0/Eigen/Dense"
 #include"activationFuncsFactory.cpp"
 
 using namespace std;
+//using Eigen::MatrixXd;
+//using Eigen::VectorXd;
 //using ActivFunctionType = double(*)(double); //for function pointers //unused currently
 
 class Layer; //forward declaration for call backs
@@ -45,7 +48,7 @@ class Layer {
             }
         }
     }
-    vector<double> forwardPropagate(vector<double> tmp_inputVals) { //accept input vals, do matrix mult, add bias, for each in vals activation function, return new output 
+   vector<double> forwardPropagate(vector<double> tmp_inputVals) { //accept input vals, do matrix mult, add bias, for each in vals activation function, return new output 
         inputVals = tmp_inputVals;
  //       cout << "sizeof weights         " << weights[0].size() << endl;
  //       cout << "sizeof input values    " << tmp_inputVals.size() << endl;

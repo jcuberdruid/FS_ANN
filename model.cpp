@@ -1,41 +1,6 @@
-/*
-################################
-# Model Class: handles layers, sort of a controller, but also user facing 
-################################
-
-model class 
-    vars
-    // loss function 
-    // learning rate 
-    // batchsize <- haven't implemented batching though so maybe not (or mayber later)
-    // optimizer 
-    // data 
-    // labels 
-    // model topography (holds layers)
-   
-    functions external:
-    model.
-        .init(loss, optimizer, learningRate) <- maybe learning rate should be optimizer param but oh well 
-        .addLayer(layer params: ) <- maybe eventually have different layers
-            ActivFunctionType activationFunction, size_t numBias, tuple<int, int> shapeWeights, vector<CallBackFunctionType> callbacks
-        .teach(
-                data 
-                labels
-                epochs
-                callBacks
-                validationSplit
-                useOptimizedLibraries=False <- (use libraries for matrix multiplication) 
-                    ) 
-        .infoLayers <- same thing as model.summary() in keras  
-                
-    functions internal 
-        forwardProgate 
-        backpropagate
-        calcLoss
-                
-*/
 #include"layer.cpp"
 #include"lossFuncsFactory.cpp"
+#include"utils.cpp"
 #include"optimizer.cpp"
 #include <iomanip>
 #include<fstream>
@@ -47,6 +12,7 @@ class Model {
  public: 
     int totalPredictions = 0;
     int correctPredictions = 0;
+    float lastAccuracy;
     LossFunction lossFunction;        
     LossDerivative lossDerivative;
     Optimizer optimizer;
@@ -86,13 +52,60 @@ class Model {
             current = nextLayer;
         }
     }
+    float getLastAccuracy() {
+        return lastAccuracy;
+    }
+    void resetAccuracy(){
+        totalPredictions = 0;
+        correctPredictions = 0;
+    }
+    /*
+        teach(
+                data 
+                labels
+                epochs
+                callBacks
+                validationSplit
+                useOptimizedLibraries=False <- (use libraries for matrix multiplication) 
+                    ) 
+        
+        data -> vector<vector<float>>
+        
+        loop epochs: 
+            for x in 
+            
 
-    void teach(vector<double> input_data, vector<int> input_labels){
+    */
+    void teach(vector<vector<int>> label_vec, vector<vector<int>> images, int epochs) {
+        for(int j = 1; j < (epochs+1); j++) {
+            const int barWidth = 70;
+            for(size_t i = 0; i < label_vec.size(); ++i) {
+                vector<double> tmp = cast_vector_to_double(images[i]);
+                epoch(tmp, label_vec[i]);
+
+                double progress = static_cast<double>(i) / label_vec.size();
+
+                cout << "[";
+                int pos = static_cast<int>(barWidth * progress);
+                for (int j = 0; j < barWidth; ++j) {
+                    if (j < pos) cout << "=";
+                    else if (j == pos) cout << ">";
+                    else cout << " ";
+                }
+                cout << "epoch " << j << "/" << epochs << "] " << int(progress * 100.0) << " % , accuracy: " << getLastAccuracy() << " %\r";
+                cout.flush(); 
+            }
+            cout << endl;
+            resetAccuracy();    
+        }
+    }
+    void epoch(vector<double> input_data, vector<int> input_labels){
         vector<double> modelOutput = forwardPropagate(input_data);  
         //cout << "######################" << endl;
-        cout << "loss "<<lossFunction (modelOutput, input_labels) << endl;
+        //cout << "loss "<<lossFunction (modelOutput, input_labels) << endl;
         vector<double> softmaxOutput = softmax(modelOutput);
         //cout << "######################" << endl;
+        /* 
         for(auto it: input_data) { 
             cout << " " << it; 
         }
@@ -105,6 +118,7 @@ class Model {
             cout << " " << it;  
         }
         cout << endl;
+        */
         auto max_it = std::max_element(softmaxOutput.begin(), softmaxOutput.end()); //XXX max function can't handle equal inputs 
         int max_index = std::distance(softmaxOutput.begin(), max_it);
         if(input_labels[max_index] == 1) {
@@ -113,16 +127,57 @@ class Model {
         } else {
             totalPredictions +=1;
         }
-        cout << "accuracy: " << float(correctPredictions)/float(totalPredictions) << endl;
+        //cout << "accuracy: " << float(correctPredictions)/float(totalPredictions) << endl;
+        
+        lastAccuracy = float(correctPredictions)/float(totalPredictions);
+
+        ofstream myfile;
+          myfile.open ("training_accuracyLog.txt",ios::app);
+          myfile << float(correctPredictions)/float(totalPredictions)  << "\n";
+          myfile.close();
+
+        //cout << "######################" << endl;
+
+        backPropagate(modelOutput, input_labels);
+    }
+    void predict(vector<double> input_data, vector<int> input_labels){ // same as teach but without backpropgation <- only predict 
+        vector<double> modelOutput = forwardPropagate(input_data);  
+        //cout << "######################" << endl;
+        //cout << "loss "<<lossFunction (modelOutput, input_labels) << endl;
+        vector<double> softmaxOutput = softmax(modelOutput);
+        //cout << "######################" << endl;
+        /*
+        for(auto it: input_data) { 
+            cout << " " << it; 
+        }
+        cout << endl;
+        for(auto it: input_labels) { 
+            cout << it << "           "; 
+        }
+        cout << endl;
+        for(auto it: softmaxOutput) { 
+            cout << " " << it;  
+        }
+        cout << endl;
+        */
+        auto max_it = std::max_element(softmaxOutput.begin(), softmaxOutput.end()); //XXX max function can't handle equal inputs 
+        int max_index = std::distance(softmaxOutput.begin(), max_it);
+        if(input_labels[max_index] == 1) {
+           correctPredictions += 1;  
+           totalPredictions +=1;
+        } else {
+            totalPredictions +=1;
+        }
+        //cout << "accuracy: " << float(correctPredictions)/float(totalPredictions) << endl;
+        lastAccuracy = float(correctPredictions)/float(totalPredictions);
 
         ofstream myfile;
           myfile.open ("accuracyLog.txt",ios::app);
           myfile << float(correctPredictions)/float(totalPredictions)  << "\n";
           myfile.close();
 
-        cout << "######################" << endl;
+        //cout << "######################" << endl;
 
-        backPropagate(modelOutput, input_labels);
     }
     void infoLayers() {
         cout << "Layer (type)\t\tWeight Matrix Shape\t\tParam #" << endl;

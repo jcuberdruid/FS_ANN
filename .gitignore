@@ -1,0 +1,5 @@
+.DS_STORE
+mnist_test.csv
+mnist_train.csv
+accuracyLog.txt
+*accuracyLog.txt

@@ -1,0 +1,6 @@
+
+- Layers interface (allow CNN and reshaping layers)
+- saving models 
+- epoching 
+- batching 
+
