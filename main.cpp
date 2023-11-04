@@ -10,11 +10,11 @@ int main()
     cout << "#################################################################" << endl;
     cout << "Generating Model" << endl;
     cout << "#################################################################" << endl;
-
     // Model
     double learningRate = 0.00015666;
     string optimizerType = "adam"; // supported: sgd, sgd_momentum, adagrad, rmsprop, adam
-    Model test("cross_entropy", optimizerType, learningRate);
+    string runNote = "tanh_256_adam";
+    Model test("cross_entropy", optimizerType, learningRate, runNote);
 
     vector<CallBackFunctionType> callbacks;
     test.addLayer("tanh", make_tuple(256, 784), callbacks);
@@ -40,10 +40,10 @@ int main()
     vector<vector<int>> label_vec = one_hot_encode(labelNums, 10);
     
     // subset data for faster testing:
-    // label_vec.resize(5000);
-    // images.resize(5000);
+    label_vec.resize(5000);
+    images.resize(5000);
     
-    test.teach(label_vec, images, 100);
+    test.teach(label_vec, images, 1);
 
     cout << "train accuracy " << test.getLastAccuracy() << endl;
 

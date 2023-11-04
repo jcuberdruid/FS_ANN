@@ -75,11 +75,8 @@ vector<vector<int>> one_hot_encode(const vector<int>& input, int num_classes) {
             encoded[i][input[i]] = 1;
         } else {
             cerr << "Value out of range: " << input[i] << endl;
-            // Handle the error according to your needs.
-            // Here, we just print an error message.
         }
     }
-
     return encoded;
 }
 

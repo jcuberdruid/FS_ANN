@@ -27,8 +27,9 @@ public:
     vector<int> labels;
     Layer *topographyHead = NULL;
     vector<CallBackFunctionType> callBacks;
+    string runNote;
 
-    Model(const string lossFunctionID, string optimizerType, double learningRate) : optimizerType(optimizerType), learningRate(learningRate)
+    Model(const string lossFunctionID, string optimizerType, double learningRate, string runNote="undefined") : optimizerType(optimizerType), learningRate(learningRate), runNote(runNote)
     {
         auto [lossFunc, lossDeriv] = getLossFunctions(lossFunctionID);
         lossFunction = lossFunc;
@@ -164,7 +165,8 @@ public:
             }
             cout << endl;
             ofstream myfile;
-            myfile.open("training_accuracyLog_tanh_RMS.txt", ios::app);
+            string trainingLog = "logs/" + runNote + "_training.txt";
+            myfile.open(trainingLog, ios::app);
             myfile << j << "," << float(correctPredictions) / float(totalPredictions) << "," << sumLoss / double(totalPredictions) << "\n";
             sumLoss = 0.0;
             myfile.close();
@@ -230,7 +232,8 @@ public:
             }
             cout << endl;
             ofstream myfile;
-            myfile.open("testing_accuracyLog_tanh_RMS.txt", ios::app);
+            string testingLog = "logs/" + runNote + "_testing.txt";
+            myfile.open(testingLog, ios::app);
             myfile << j << "," << float(correctPredictions) / float(totalPredictions) << "," << sumLoss / double(totalPredictions) << "\n";
             sumLoss = 0.0;
             myfile.close();
@@ -299,3 +302,4 @@ private:
         }
     }
 };
+

@@ -4,6 +4,7 @@ mnist_train.csv
 newclassify.py
 accuracyLog.txt
 old/
+logs/*
 *accuracyLog.txt
 *.out
 .vscode
