@@ -16,11 +16,12 @@ cout << "#################################################################" << e
 
 // Model
 Optimizer opt;
-double learningRate = 0.01;
+double learningRate = 0.000478752177;
 Model test("cross_entropy", opt, learningRate);
 vector<CallBackFunctionType> callbacks;
-test.addLayer("tanh", make_tuple(256, 784), callbacks); 
-test.addLayer("tanh", make_tuple(10, 256), callbacks); 
+test.addLayer("tanh", make_tuple(1000, 784), callbacks); 
+test.addLayer("tanh", make_tuple(1000, 1000), callbacks); 
+test.addLayer("tanh", make_tuple(10, 1000), callbacks); 
 test.infoLayers();
 
 
@@ -45,7 +46,7 @@ cout << "#################################################################" << e
     }
     */
 
-    test.teach(label_vec, images, 10);
+    test.teach(label_vec, images, 100);
 
 cout << "train accuracy " << test.getLastAccuracy() << endl;
 
@@ -53,11 +54,26 @@ cout << "#################################################################" << e
 cout << "Finished training, begining testing..." << endl;
 cout << "#################################################################" << endl;
 
-/*
-for (int i = 0; i < 300; i++) {
-    test.predict(test_vals, test_labels);
-}
-cout << "test accuracy" << test.getLastAccuracy() << endl;
-*/
+  vector<int> test_labelNums;
+    vector<vector<int>> test_images;
+    if (load_mnist_csv("mnist_test.csv", test_labelNums, test_images)) {
+        cout << "Loaded " << test_images.size() << " testing examples." << endl;
+    } else {
+        cerr << "Failed to load test data." << endl;
+        return 1;
+    }
+
+    vector<vector<int>> test_label_vec = one_hot_encode(test_labelNums, 10);
+    /*
+    for(size_t i = 0; i < test_labelNums.size(); ++i) {
+        vector<double> tmp = cast_vector_to_double(test_images[i]);
+        test.teach(tmp, test_label_vec[i]);
+    }
+    */
+
+    test.predict(test_label_vec, test_images);
+
+cout << "train accuracy " << test.getLastAccuracy() << endl;
+
 return 0;
 }

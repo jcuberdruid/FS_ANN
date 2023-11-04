@@ -14,10 +14,6 @@ vector<double> softmax(const vector<double>& inputs);
 
 double cross_entropy(const vector<double>& outputs, const vector<int>& labels) {
     const vector<double>& outputs_softmax = softmax(outputs);
-    for(auto it: outputs_softmax) {
-        cout << it; 
-    }
-    cout << endl;
     double loss = 0.0;
     for (size_t i = 0; i < outputs.size(); ++i) {
         loss -= labels[i] * log(outputs_softmax[i]);
