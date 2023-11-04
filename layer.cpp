@@ -1,16 +1,25 @@
 #include <iostream>
 #include <vector>
 #include <random>
-// #include"eigen-3.4.0/Eigen/Dense"
 #include "activationFuncsFactory.cpp"
 
 using namespace std;
-// using Eigen::MatrixXd;
-// using Eigen::VectorXd;
-// using ActivFunctionType = double(*)(double); //for function pointers //unused currently
 
 class Layer; // forward declaration for call backs
 using CallBackFunctionType = void (*)(Layer *);
+
+class Optimizer
+{
+public:
+    virtual void backwardPropagate(vector<double> &gradient, double learningRate) = 0;
+    Layer *thisLayer;
+    void setLayer(Layer *layerPtr)
+    {
+        this->thisLayer = layerPtr;
+    }
+};
+
+Optimizer *getOptimizer(string optimizerType, tuple<int, int> shapeWeights);
 
 class Layer
 {
@@ -22,15 +31,20 @@ public:
     vector<double> bias;
     vector<double> lastOutput;
     vector<double> inputVals;
+    // vector<double> lastChange; <- part of optimizer now
+    Optimizer *optimizer;
+
     ActivationFunction activationFunction;
     ActivationDerivative activationDerivative;
 
     vector<CallBackFunctionType> callbacks;
 
-    Layer(const string activationID, tuple<int, int> shapeWeights, vector<CallBackFunctionType> callbacks)
+    Layer(const string activationID, tuple<int, int> shapeWeights, string optimizerType, vector<CallBackFunctionType> callbacks)
         : bias(get<0>(shapeWeights), 0.0), callbacks(callbacks), prev(nullptr), next(nullptr)
     {
         initWeights(shapeWeights);
+        optimizer = getOptimizer(optimizerType, shapeWeights);
+        optimizer->setLayer(this);
         auto [func, deriv] = getActivationFunctions(activationID);
         activationFunction = func;
         activationDerivative = deriv;
@@ -84,11 +98,26 @@ public:
     }
     void backwardPropagate(vector<double> &gradient, double learningRate)
     {
+        optimizer->backwardPropagate(gradient, learningRate);
+    }
+};
+
+////////////// Optimizer implementations/derived classes
+
+class SGD : public Optimizer
+{
+public:
+    SGD(tuple<int, int> shapeWeights)
+    {
+    }
+
+    void backwardPropagate(vector<double> &gradient, double learningRate)
+    {
         // Compute dOut/dNet (the derivative of the activation function)
-        vector<double> dOut_dNet(lastOutput.size());
-        for (size_t i = 0; i < lastOutput.size(); ++i)
+        vector<double> dOut_dNet(thisLayer->lastOutput.size());
+        for (size_t i = 0; i < thisLayer->lastOutput.size(); ++i)
         {
-            dOut_dNet[i] = activationDerivative(lastOutput[i]);
+            dOut_dNet[i] = thisLayer->activationDerivative(thisLayer->lastOutput[i]);
         }
 
         // Compute dLoss/dNet (gradient with respect to the inputs of the activation function)
@@ -99,79 +128,272 @@ public:
         }
 
         // If there is a previous layer, prepare its gradient
-        if (prev)
+        if (thisLayer->prev)
         {
-            prevLayerGradient.resize(weights[0].size(), 0.0);
-            for (size_t i = 0; i < weights.size(); ++i)
+            thisLayer->prevLayerGradient.resize(thisLayer->weights[0].size(), 0.0);
+            for (size_t i = 0; i < thisLayer->weights.size(); ++i)
             {
-                for (size_t j = 0; j < weights[0].size(); ++j)
+                for (size_t j = 0; j < thisLayer->weights[0].size(); ++j)
                 {
-                    prevLayerGradient[j] += dLoss_dNet[i] * weights[i][j];
+                    thisLayer->prevLayerGradient[j] += dLoss_dNet[i] * thisLayer->weights[i][j];
                 }
             }
         }
 
-        // Compute gradients with respect to weights and biases
-        for (size_t i = 0; i < weights.size(); ++i)
+        // Compute gradients with respect to thisLayer->weights and thisLayer->biases
+        for (size_t i = 0; i < thisLayer->weights.size(); ++i)
         {
-            for (size_t j = 0; j < weights[i].size(); ++j)
+            for (size_t j = 0; j < thisLayer->weights[i].size(); ++j)
             {
                 // Update the weight by subtracting the learning rate times the gradient
-                weights[i][j] -= learningRate * dLoss_dNet[i] * (prev ? prev->lastOutput[j] : inputVals[j]); // inputVals should be the input to the current layer
+                thisLayer->weights[i][j] -= learningRate * dLoss_dNet[i] * (thisLayer->prev ? thisLayer->prev->lastOutput[j] : thisLayer->inputVals[j]); // thisLayer->inputVals should be the input to the current layer
             }
-            // Update the bias by subtracting the learning rate times the gradient
-            bias[i] -= learningRate * dLoss_dNet[i];
+            // Update the thisLayer->bias by subtracting the learning rate times the gradient
+            thisLayer->bias[i] -= learningRate * dLoss_dNet[i];
         }
     }
 };
 
-/*
-################################################################
-# Example function pointers: activation and call back
-################################################################
-*/
-double activationFunctionTest(double x)
+class SGDwMomentum : public Optimizer
 {
-    cout << "test function" << endl;
-    double test = 566.7;
-    return test;
-}
+public:
+    double momentum = 0.3;
+    vector<double> lastChange;
 
-void exampleCallback(Layer *layer)
-{
-    if (layer != nullptr)
+    SGDwMomentum(tuple<int, int> shapeWeights) : lastChange(get<0>(shapeWeights), 0.0)
     {
-        cout << "Callback called on Layer instance. First weight is: ";
-        if (!layer->weights.empty())
+    }
+
+    void backwardPropagate(vector<double> &gradient, double learningRate)
+    {
+        vector<double> dOut_dNet(thisLayer->lastOutput.size());
+        for (size_t i = 0; i < thisLayer->lastOutput.size(); ++i)
         {
-            cout << layer->weights[0].front() << endl;
+            dOut_dNet[i] = thisLayer->activationDerivative(thisLayer->lastOutput[i]);
+        }
+
+        vector<double> dLoss_dNet(gradient.size());
+        for (size_t i = 0; i < gradient.size(); ++i)
+        {
+            dLoss_dNet[i] = gradient[i] * dOut_dNet[i];
+        }
+
+        if (thisLayer->prev)
+        {
+            thisLayer->prevLayerGradient.resize(thisLayer->weights[0].size(), 0.0);
+            for (size_t i = 0; i < thisLayer->weights.size(); ++i)
+            {
+                for (size_t j = 0; j < thisLayer->weights[0].size(); ++j)
+                {
+                    thisLayer->prevLayerGradient[j] += dLoss_dNet[i] * thisLayer->weights[i][j];
+                }
+            }
+        }
+
+        for (size_t i = 0; i < thisLayer->weights.size(); ++i)
+        {
+            for (size_t j = 0; j < thisLayer->weights[i].size(); ++j)
+            {
+                auto newChange = learningRate * dLoss_dNet[i] * (thisLayer->prev ? thisLayer->prev->lastOutput[j] : thisLayer->inputVals[j]) + momentum * lastChange[i];
+                thisLayer->weights[i][j] -= newChange;
+                lastChange[i] = newChange;
+            }
+            thisLayer->bias[i] -= learningRate * dLoss_dNet[i];
         }
     }
-}
+};
 
-/*
-################################################################
-# testing main function
-################################################################
-int main() {
-    cout << "main" << endl;
+class AdaGrad : public Optimizer
+{
+private:
+    vector<vector<double>> gradientHistory;
 
-    vector<CallBackFunctionType> myCallbacks = {exampleCallback};
-    Layer bla(activationFunctionTest, 5, make_tuple(5, 7), myCallbacks);
-
-    for (auto& callback : bla.callbacks) {
-        callback(&bla);
+public:
+    AdaGrad(tuple<int, int> shapeWeights)
+    {
+        int rows = get<0>(shapeWeights);
+        int cols = get<1>(shapeWeights);
+        gradientHistory.resize(rows, vector<double>(cols, 0.0));
     }
 
-    vector<double> testVal(7, 14.0);
+    void backwardPropagate(vector<double> &gradient, double learningRate)
+    {
+        vector<double> dOut_dNet(thisLayer->lastOutput.size());
+        for (size_t i = 0; i < thisLayer->lastOutput.size(); ++i)
+        {
+            dOut_dNet[i] = thisLayer->activationDerivative(thisLayer->lastOutput[i]);
+        }
 
-    vector<double> testoutput = bla.forwardPropagate(testVal);
+        vector<double> dLoss_dNet(gradient.size());
+        for (size_t i = 0; i < gradient.size(); ++i)
+        {
+            dLoss_dNet[i] = gradient[i] * dOut_dNet[i];
+        }
 
-    for(auto it: testoutput) {
-        cout << it << endl;
+        if (thisLayer->prev)
+        {
+            thisLayer->prevLayerGradient.resize(thisLayer->weights[0].size(), 0.0);
+            for (size_t i = 0; i < thisLayer->weights.size(); ++i)
+            {
+                for (size_t j = 0; j < thisLayer->weights[0].size(); ++j)
+                {
+                    thisLayer->prevLayerGradient[j] += dLoss_dNet[i] * thisLayer->weights[i][j];
+                }
+            }
+        }
+
+        for (size_t i = 0; i < thisLayer->weights.size(); ++i)
+        {
+            for (size_t j = 0; j < thisLayer->weights[i].size(); ++j)
+            {
+                double gradient = dLoss_dNet[i] * (thisLayer->prev ? thisLayer->prev->lastOutput[j] : thisLayer->inputVals[j]);
+                gradientHistory[i][j] += std::pow(gradient, 2);
+
+                double adjustedLearningRate = learningRate / (sqrt(gradientHistory[i][j]) + 1e-7);
+                thisLayer->weights[i][j] -= adjustedLearningRate * gradient;
+            }
+            double gradient = dLoss_dNet[i];
+            gradientHistory[i][thisLayer->bias.size()] += std::pow(gradient, 2);
+            double adjustedLearningRateBias = learningRate / (sqrt(gradientHistory[i][thisLayer->bias.size()]) + 1e-7);
+            thisLayer->bias[i] -= adjustedLearningRateBias * gradient;
+        }
+    }
+};
+
+class RMSProp : public Optimizer
+{
+private:
+    double decayRate = 0.9;
+    double epsilon = 1e-8;
+    vector<vector<double>> squaredGradientAverage;
+
+public:
+    RMSProp(tuple<int, int> shapeWeights)
+    {
+        int rows = get<0>(shapeWeights);
+        int cols = get<1>(shapeWeights);
+        squaredGradientAverage.resize(rows, vector<double>(cols, 0.0));
     }
 
-    return 0;
-}
+    void backwardPropagate(vector<double> &gradient, double learningRate)
+    {
+        vector<double> dOut_dNet(thisLayer->lastOutput.size());
+        for (size_t i = 0; i < thisLayer->lastOutput.size(); ++i)
+        {
+            dOut_dNet[i] = thisLayer->activationDerivative(thisLayer->lastOutput[i]);
+        }
 
-*/
+        vector<double> dLoss_dNet(gradient.size());
+        for (size_t i = 0; i < gradient.size(); ++i)
+        {
+            dLoss_dNet[i] = gradient[i] * dOut_dNet[i];
+        }
+
+        if (thisLayer->prev)
+        {
+            thisLayer->prevLayerGradient.resize(thisLayer->weights[0].size(), 0.0);
+            for (size_t i = 0; i < thisLayer->weights.size(); ++i)
+            {
+                for (size_t j = 0; j < thisLayer->weights[0].size(); ++j)
+                {
+                    thisLayer->prevLayerGradient[j] += dLoss_dNet[i] * thisLayer->weights[i][j];
+                }
+            }
+        }
+
+        for (size_t i = 0; i < thisLayer->weights.size(); ++i)
+        {
+            for (size_t j = 0; j < thisLayer->weights[i].size(); ++j)
+            {
+                double gradient = dLoss_dNet[i] * (thisLayer->prev ? thisLayer->prev->lastOutput[j] : thisLayer->inputVals[j]);
+                squaredGradientAverage[i][j] = decayRate * squaredGradientAverage[i][j] + (1 - decayRate) * gradient * gradient;
+                double adjustedLearningRate = learningRate / (sqrt(squaredGradientAverage[i][j]) + epsilon);
+                thisLayer->weights[i][j] -= adjustedLearningRate * gradient;
+            }
+            double biasGradient = dLoss_dNet[i];
+            squaredGradientAverage[i][thisLayer->bias.size()] = decayRate * squaredGradientAverage[i][thisLayer->bias.size()] + (1 - decayRate) * biasGradient * biasGradient;
+            double adjustedLearningRateBias = learningRate / (sqrt(squaredGradientAverage[i][thisLayer->bias.size()]) + epsilon);
+            thisLayer->bias[i] -= adjustedLearningRateBias * biasGradient;
+        }
+    }
+};
+
+class Adam : public Optimizer {
+private:
+    double beta1 = 0.9;
+    double beta2 = 0.999;
+    double epsilon = 1e-8;
+    int t = 0;
+    vector<vector<double>> m;
+    vector<vector<double>> v;
+
+public:
+    Adam(tuple<int, int> shapeWeights) {
+        int rows = get<0>(shapeWeights);
+        int cols = get<1>(shapeWeights);
+        m.resize(rows, vector<double>(cols, 0.0));
+        v.resize(rows, vector<double>(cols, 0.0));
+    }
+
+    void backwardPropagate(vector<double> &gradient, double learningRate) {
+        t++;
+        vector<double> dOut_dNet(thisLayer->lastOutput.size());
+        for (size_t i = 0; i < thisLayer->lastOutput.size(); ++i) {
+            dOut_dNet[i] = thisLayer->activationDerivative(thisLayer->lastOutput[i]);
+        }
+
+        vector<double> dLoss_dNet(gradient.size());
+        for (size_t i = 0; i < gradient.size(); ++i) {
+            dLoss_dNet[i] = gradient[i] * dOut_dNet[i];
+        }
+
+        if (thisLayer->prev) {
+            thisLayer->prevLayerGradient.resize(thisLayer->weights[0].size(), 0.0);
+            for (size_t i = 0; i < thisLayer->weights.size(); ++i) {
+                for (size_t j = 0; j < thisLayer->weights[0].size(); ++j) {
+                    thisLayer->prevLayerGradient[j] += dLoss_dNet[i] * thisLayer->weights[i][j];
+                }
+            }
+        }
+
+        for (size_t i = 0; i < thisLayer->weights.size(); ++i) {
+            for (size_t j = 0; j < thisLayer->weights[i].size(); ++j) {
+                double grad = dLoss_dNet[i] * (thisLayer->prev ? thisLayer->prev->lastOutput[j] : thisLayer->inputVals[j]);
+                m[i][j] = beta1 * m[i][j] + (1 - beta1) * grad;
+                v[i][j] = beta2 * v[i][j] + (1 - beta2) * grad * grad;
+                double m_hat = m[i][j] / (1 - pow(beta1, t));
+                double v_hat = v[i][j] / (1 - pow(beta2, t));
+                thisLayer->weights[i][j] -= learningRate * m_hat / (sqrt(v_hat) + epsilon);
+            }
+            double biasGrad = dLoss_dNet[i];
+            m[i][thisLayer->bias.size()] = beta1 * m[i][thisLayer->bias.size()] + (1 - beta1) * biasGrad;
+            v[i][thisLayer->bias.size()] = beta2 * v[i][thisLayer->bias.size()] + (1 - beta2) * biasGrad * biasGrad;
+            double m_hat_bias = m[i][thisLayer->bias.size()] / (1 - pow(beta1, t));
+            double v_hat_bias = v[i][thisLayer->bias.size()] / (1 - pow(beta2, t));
+            thisLayer->bias[i] -= learningRate * m_hat_bias / (sqrt(v_hat_bias) + epsilon);
+        }
+    }
+};
+
+
+Optimizer *getOptimizer(string optimizerType, tuple<int, int> shapeWeights)
+{
+    if (optimizerType == "sgd")
+    {
+        return new SGD(shapeWeights);
+    }
+    else if (optimizerType == "sgd_momentum")
+    {
+        return new SGDwMomentum(shapeWeights);
+    }
+    else if (optimizerType == "adagrad") {
+        return new AdaGrad(shapeWeights);
+    }
+    else if (optimizerType == "rmsprop") {
+        return new RMSProp(shapeWeights);
+    }
+    else if (optimizerType == "adam") {
+        return new Adam(shapeWeights);
+    }
+    return new SGD(shapeWeights);
+}

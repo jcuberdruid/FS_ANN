@@ -1,9 +1,7 @@
 #include "model.cpp"
 #include "loadcsv.cpp"
 #include <iomanip>
-// #include"lossFuncs.cpp"
-// #include"activationFuncs.cpp"
-// #include"optimizer.cpp"
+
 using namespace std;
 
 int main()
@@ -14,13 +12,13 @@ int main()
     cout << "#################################################################" << endl;
 
     // Model
-    Optimizer opt;
-    double learningRate = 0.000478752177;
-    Model test("cross_entropy", opt, learningRate);
+    double learningRate = 0.00015666;
+    string optimizerType = "adam"; // supported: sgd, sgd_momentum, adagrad, rmsprop, adam
+    Model test("cross_entropy", optimizerType, learningRate);
+
     vector<CallBackFunctionType> callbacks;
-    test.addLayer("tanh", make_tuple(1000, 784), callbacks);
-    test.addLayer("tanh", make_tuple(1000, 1000), callbacks);
-    test.addLayer("tanh", make_tuple(10, 1000), callbacks);
+    test.addLayer("tanh", make_tuple(256, 784), callbacks);
+    test.addLayer("tanh", make_tuple(10, 256), callbacks);
     test.infoLayers();
 
     cout << "#################################################################" << endl;
@@ -40,13 +38,11 @@ int main()
     }
 
     vector<vector<int>> label_vec = one_hot_encode(labelNums, 10);
-    /*
-    for(size_t i = 0; i < labelNums.size(); ++i) {
-        vector<double> tmp = cast_vector_to_double(images[i]);
-        test.teach(tmp, label_vec[i]);
-    }
-    */
-
+    
+    // subset data for faster testing:
+    // label_vec.resize(5000);
+    // images.resize(5000);
+    
     test.teach(label_vec, images, 100);
 
     cout << "train accuracy " << test.getLastAccuracy() << endl;

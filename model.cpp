@@ -1,7 +1,6 @@
 #include "layer.cpp"
 #include "lossFuncsFactory.cpp"
 #include "utils.cpp"
-#include "optimizer.cpp"
 #include <iomanip>
 #include <fstream>
 #include <random>
@@ -20,7 +19,7 @@ public:
     float lastAccuracy;
     LossFunction lossFunction;
     LossDerivative lossDerivative;
-    Optimizer optimizer;
+    string optimizerType;
     double learningRate;
     // int batchSize; <- mayber not
     // optimizer <- interface
@@ -29,16 +28,15 @@ public:
     Layer *topographyHead = NULL;
     vector<CallBackFunctionType> callBacks;
 
-    Model(const string lossFunctionID, Optimizer optimizer, double learningRate) : optimizer(optimizer), learningRate(learningRate)
+    Model(const string lossFunctionID, string optimizerType, double learningRate) : optimizerType(optimizerType), learningRate(learningRate)
     {
-
         auto [lossFunc, lossDeriv] = getLossFunctions(lossFunctionID);
         lossFunction = lossFunc;
         lossDerivative = lossDeriv;
     }
     void addLayer(string activationID, tuple<int, int> shapeWeights, vector<CallBackFunctionType> callbacks)
     {
-        Layer *newLayer = new Layer(activationID, shapeWeights, callbacks);
+        Layer *newLayer = new Layer(activationID, shapeWeights, optimizerType, callbacks);
 
         if (topographyHead == NULL)
         {
@@ -67,7 +65,7 @@ public:
     }
     float getLastAccuracy()
     {
-        return lastAccuracy;
+        return lastAccuracy * 100;
     }
     void resetAccuracy()
     {
@@ -144,9 +142,9 @@ public:
             const int barWidth = 70;
             for (size_t i = 0; i < label_vec.size(); ++i)
             {
-                vector<double> tmp = cast_vector_to_double(images[i]);
+                vector<double> tmp(images[i].begin(), images[i].end());
                 // normalizeVector(tmp);
-                epoch(tmp, label_vec[i]);
+                pass(tmp, label_vec[i]);
 
                 double progress = static_cast<double>(i) / label_vec.size();
 
@@ -161,7 +159,7 @@ public:
                     else
                         cout << " ";
                 }
-                cout << "epoch " << j << "/" << epochs << "] " << int(progress * 100.0) << " % , accuracy: " << getLastAccuracy() << " %\r";
+                cout << "\r\e[K epoch " << j << "/" << epochs << "] " << int(progress * 100.0) << "% , accuracy: " << getLastAccuracy() << "%";
                 cout.flush();
             }
             cout << endl;
@@ -174,27 +172,12 @@ public:
         }
         train = false;
     }
-    void epoch(vector<double> input_data, vector<int> input_labels)
+    void pass(vector<double> input_data, vector<int> input_labels)
     {
         vector<double> modelOutput = forwardPropagate(input_data);
         // cout << "######################" << endl;
         sumLoss += lossFunction(modelOutput, input_labels);
         vector<double> softmaxOutput = softmax(modelOutput);
-        // cout << "######################" << endl;
-        /*
-        for(auto it: input_data) {
-            cout << " " << it;
-        }
-        cout << endl;
-        for(auto it: input_labels) {
-            cout << it << "           ";
-        }
-        cout << endl;
-        for(auto it: softmaxOutput) {
-            cout << " " << it;
-        }
-        cout << endl;
-        */
         auto max_it = std::max_element(softmaxOutput.begin(), softmaxOutput.end()); // XXX max function can't handle equal inputs
         int max_index = std::distance(softmaxOutput.begin(), max_it);
         if (input_labels[max_index] == 1)
@@ -226,7 +209,7 @@ public:
             for (size_t i = 0; i < label_vec.size(); ++i)
             {
                 vector<double> tmp = cast_vector_to_double(images[i]);
-                epoch(tmp, label_vec[i]);
+                pass(tmp, label_vec[i]);
 
                 double progress = static_cast<double>(i) / label_vec.size();
 

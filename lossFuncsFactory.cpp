@@ -21,17 +21,26 @@ double cross_entropy(const vector<double>& outputs, const vector<int>& labels) {
     return loss;
 }
 
-vector<double> softmax_cross_entropy_derivative(const vector<double>& outputs, const vector<int>& labels) {
+vector<double> outputs_error(const vector<double>& outputs, const vector<int>& labels) {
     vector<double> derivatives(outputs.size());
     for (size_t i = 0; i < outputs.size(); ++i) {
         derivatives[i] = outputs[i] - labels[i];
     }
     return derivatives;
 }
+/*
+double sigmoid_loss(const vector<double>& outputs, const vector<int>& labels) {
+    double loss = 0.0;
+    for (size_t i = 0; i < outputs.size(); ++i) {
+        loss += -outputs[i] * (double)labels[i] + log(1 + exp(outputs[i]));
+    }
+    return loss;
+}
+*/
 
 LossPair getLossFunctions(const string& name) {
     static unordered_map<string, LossPair> loss_map = {
-        {"cross_entropy", {cross_entropy, softmax_cross_entropy_derivative}},
+        {"cross_entropy", {cross_entropy, outputs_error}},
     };
 
     auto it = loss_map.find(name);
