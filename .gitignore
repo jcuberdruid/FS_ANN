@@ -1,6 +1,7 @@
 .DS_STORE
 mnist_test.csv
 mnist_train.csv
+newclassify.py
 accuracyLog.txt
 *accuracyLog.txt
 *.out
