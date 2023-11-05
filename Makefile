@@ -1,4 +1,4 @@
-CXX = clang++
+CXX = g++
 CXXFLAGS = -Ofast -std=c++20
 TARGET = runmain.out
 SRC = main.cpp 

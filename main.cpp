@@ -4,21 +4,51 @@
 
 using namespace std;
 
-int main()
-{
 
+#include <iostream>
+#include <vector>
+#include <string>
+#include <cstdlib>
+#include <cstring>
+
+using namespace std;
+
+// Assuming the Model, CallBackFunctionType, load_mnist_csv and one_hot_encode 
+// are defined somewhere in the program.
+
+int main(int argc, char* argv[])
+{
     cout << "#################################################################" << endl;
     cout << "Generating Model" << endl;
     cout << "#################################################################" << endl;
-    // Model
+
+    // Default values
     double learningRate = 0.00015666;
-    string optimizerType = "adam"; // supported: sgd, sgd_momentum, adagrad, rmsprop, adam
-    string runNote = "tanh_256_adam";
+    string optimizerType = "sgd"; // supported: sgd, sgd_momentum, adagrad, rmsprop, adam
+    string activationFunction = "sigmoid";
+    string runNote = "sigmoid_256_sgd";
+
+    // Parse command line arguments
+    for(int i = 1; i < argc; i++) {
+        if(strcmp(argv[i], "-lr") == 0 && i + 1 < argc) {
+            learningRate = atof(argv[++i]);
+        } else if(strcmp(argv[i], "-opt") == 0 && i + 1 < argc) {
+            optimizerType = argv[++i];
+        } else if(strcmp(argv[i], "-act") == 0 && i + 1 < argc) {
+            activationFunction = argv[++i];
+        } else if(strcmp(argv[i], "-note") == 0 && i + 1 < argc) {
+            runNote = argv[++i];
+        } else {
+            cerr << "Usage: " << argv[0] << " [-lr learning_rate] [-opt optimizer] [-act activation_function] [-note run_note]" << endl;
+            return 1;
+        }
+    }
+
     Model test("cross_entropy", optimizerType, learningRate, runNote);
 
     vector<CallBackFunctionType> callbacks;
-    test.addLayer("tanh", make_tuple(256, 784), callbacks);
-    test.addLayer("tanh", make_tuple(10, 256), callbacks);
+    test.addLayer(activationFunction, make_tuple(256, 784), callbacks);
+    test.addLayer(activationFunction, make_tuple(10, 256), callbacks);
     test.infoLayers();
 
     cout << "#################################################################" << endl;
@@ -40,10 +70,10 @@ int main()
     vector<vector<int>> label_vec = one_hot_encode(labelNums, 10);
     
     // subset data for faster testing:
-    label_vec.resize(5000);
-    images.resize(5000);
+    //label_vec.resize(5000);
+    //images.resize(5000);
     
-    test.teach(label_vec, images, 1);
+    test.teach(label_vec, images, 100);
 
     cout << "train accuracy " << test.getLastAccuracy() << endl;
 
